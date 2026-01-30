@@ -1,4 +1,6 @@
 
+using Billing.API.Configurations;
+
 namespace Billing.API
 {
     public class Program
@@ -13,6 +15,10 @@ namespace Billing.API
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
+
+            builder.ConfigureDatabase();
+            builder.ConfigureDependencies();
+
 
             var app = builder.Build();
 
