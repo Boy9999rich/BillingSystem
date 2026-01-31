@@ -25,7 +25,6 @@ namespace Billing.API.Controllers
         {
             try
             {
-                // Event'ni Kafka topic'iga yozish
                 await _kafkaProducer.PublishAsync(dto);
 
                 return Ok(new
@@ -62,14 +61,5 @@ namespace Billing.API.Controllers
             }
         }
 
-        [HttpGet("health")]
-        public IActionResult HealthCheck()
-        {
-            return Ok(new
-            {
-                status = "healthy",
-                timestamp = DateTime.UtcNow
-            });
-        }
     }
 }

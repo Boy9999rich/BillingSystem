@@ -18,13 +18,10 @@ namespace Billing.Infrastructure.Kafka
             var config = new ProducerConfig
             {
                 BootstrapServers = bootstrapServers,
-                // Idempotency - duplicate xabarlarni oldini oladi
                 EnableIdempotence = true,
-                // Reliability settings
-                Acks = Acks.All, // Barcha replica'lar acknowledge qilishi kerak
+                Acks = Acks.All,
                 MaxInFlight = 5,
                 MessageSendMaxRetries = 3,
-                // Performance
                 CompressionType = CompressionType.Snappy,
                 LingerMs = 5
             };
@@ -33,18 +30,15 @@ namespace Billing.Infrastructure.Kafka
                 .Build();
         }
 
-        /// <summary>
-        /// UsageEvent ni Kafka topic'iga yozadi
-        /// </summary>
-        /// <param name="dto">Usage event ma'lumoti</param>
+        
+          /// <param name="dto">Usage event data</param>
         public async Task PublishAsync(UsageEventDto dto)
         {
             var message = new Message<string, string>
             {
-                // Key sifatida UserId - bu bir user'ning eventlari bir partition'da bo'lishini ta'minlaydi (ordering)
+               
                 Key = dto.UserId,
                 Value = JsonSerializer.Serialize(dto),
-                // Headers qo'shish mumkin (ixtiyoriy)
                 Headers = new Headers
                 {
                     { "event-type", System.Text.Encoding.UTF8.GetBytes("usage-event") },

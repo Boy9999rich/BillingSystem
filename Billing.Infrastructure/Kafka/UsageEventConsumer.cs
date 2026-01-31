@@ -30,17 +30,13 @@ namespace Billing.Infrastructure.Kafka
                 BootstrapServers = _configuration["Kafka:BootstrapServers"],
                 GroupId = _configuration["Kafka:GroupId"] ?? "billing-consumer-group",
 
-                // Consumer offset strategiyasi
-                AutoOffsetReset = AutoOffsetReset.Earliest, // Boshidan o'qiydi agar offset topilmasa
+                AutoOffsetReset = AutoOffsetReset.Earliest, 
 
-                // Manual commit - har bir xabar muvaffaqiyatli qayta ishlangandan keyin
                 EnableAutoCommit = false,
 
-                // Session timeout - consumer heartbeat
                 SessionTimeoutMs = 45000,
                 MaxPollIntervalMs = 300000,
 
-                // Performance
                 FetchMinBytes = 1,
                 FetchWaitMaxMs = 500
             };
@@ -70,7 +66,6 @@ namespace Billing.Infrastructure.Kafka
                 {
                     try
                     {
-                        // Kafka'dan xabar o'qish (100ms timeout)
                         var consumeResult = consumer.Consume(stoppingToken);
 
                         if (consumeResult?.Message == null)
@@ -78,7 +73,6 @@ namespace Billing.Infrastructure.Kafka
 
                         Console.WriteLine($"Received message: Partition={consumeResult.Partition}, Offset={consumeResult.Offset}");
 
-                        // JSON deserialize
                         var usageEvent = JsonSerializer.Deserialize<UsageEventDto>(
                             consumeResult.Message.Value,
                             new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
@@ -87,14 +81,13 @@ namespace Billing.Infrastructure.Kafka
                         if (usageEvent == null)
                         {
                             Console.WriteLine("Failed to deserialize message");
-                            consumer.Commit(consumeResult); // Skip invalid message
+                            consumer.Commit(consumeResult); 
                             continue;
                         }
 
-                        // Process event through BillingService
+                        
                         ProcessEvent(usageEvent).Wait();
 
-                        // Manual commit - faqat muvaffaqiyatli qayta ishlangan xabarlar commit qilinadi
                         consumer.Commit(consumeResult);
 
                         Console.WriteLine($"Successfully processed event: {usageEvent.EventId}");
@@ -106,8 +99,7 @@ namespace Billing.Infrastructure.Kafka
                     catch (Exception ex)
                     {
                         Console.WriteLine($"Processing error: {ex.Message}");
-                        // Errorni log qilish lekin consumerni to'xtatmaslik
-                        // Production'da retry mexanizmi bo'lishi kerak
+                        
                     }
                 }
             }
@@ -124,13 +116,11 @@ namespace Billing.Infrastructure.Kafka
 
         private async Task ProcessEvent(UsageEventDto usageEvent)
         {
-            // Har bir message uchun yangi scope yaratish (scoped services)
             using var scope = _scopeFactory.CreateScope();
 
             var billingService = scope.ServiceProvider
                 .GetRequiredService<IBillingService>();
 
-            // BillingService orqali event'ni qayta ishlash
             await billingService.ProcessUsageAsync(usageEvent);
         }
 
