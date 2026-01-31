@@ -1,6 +1,6 @@
 ﻿using Billing.Application.DTOs;
 using Billing.Application.Services;
-using Billing.Infrastructure.EventQueue;
+using Billing.Infrastructure.Kafka;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,51 +11,65 @@ namespace Billing.API.Controllers
     public class BillingController : ControllerBase
     {
         private readonly IBillingService _billingService;
-        private readonly InMemoryEventQueue _queue;
+        private readonly KafkaProducerService _kafkaProducer;
 
         public BillingController(
             IBillingService billingService,
-            InMemoryEventQueue queue)
+            KafkaProducerService kafkaProducer)
         {
             _billingService = billingService;
-            _queue = queue;
+            _kafkaProducer = kafkaProducer;
         }
-
         [HttpPost("process")]
-        public async Task<IActionResult> ProcessUsage(
-            UsageEventDto dto)
+        public async Task<IActionResult> ProcessUsage([FromBody] UsageEventDto dto)
         {
-            await _queue.PublishAsync(dto);
+            try
+            {
+                // Event'ni Kafka topic'iga yozish
+                await _kafkaProducer.PublishAsync(dto);
 
-            return Ok("Event queued");
+                return Ok(new
+                {
+                    message = "Event successfully published to Kafka",
+                    eventId = dto.EventId,
+                    userId = dto.UserId
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    error = "Failed to publish event",
+                    details = ex.Message
+                });
+            }
+        }
+        [HttpGet("users/{userId}/balance")]
+        public async Task<IActionResult> GetBalance(string userId)
+        {
+            try
+            {
+                var balance = await _billingService.GetBalanceAsync(userId);
+                return Ok(balance);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    error = "Failed to retrieve balance",
+                    details = ex.Message
+                });
+            }
         }
 
-
-
-
-
-        //private readonly IBillingService _billingService;
-
-        //public BillingController(IBillingService billingService)
-        //{
-        //    _billingService = billingService;
-        //}
-
-        //// Eventni qo'lda yuborib test qilish uchun
-        //[HttpPost("process")]
-        //public async Task<IActionResult> ProcessUsage(
-        //    [FromBody] UsageEventDto dto)
-        //{
-        //    await _billingService.ProcessUsageAsync(dto);
-        //    return Ok(new { message = "Event processed" });
-        //}
-
-        //// User balansini olish
-        //[HttpGet("users/{userId}/balance")]
-        //public async Task<IActionResult> GetBalance(string userId)
-        //{
-        //    var result = await _billingService.GetBalanceAsync(userId);
-        //    return Ok(result);
-        //}
+        [HttpGet("health")]
+        public IActionResult HealthCheck()
+        {
+            return Ok(new
+            {
+                status = "healthy",
+                timestamp = DateTime.UtcNow
+            });
+        }
     }
 }

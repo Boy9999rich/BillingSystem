@@ -1,6 +1,5 @@
 ﻿using Billing.Application.Interfaces.Repositories;
 using Billing.Application.Services;
-using Billing.Infrastructure.EventQueue;
 using Billing.Infrastructure.Kafka;
 using Billing.Infrastructure.Repositories;
 
@@ -14,8 +13,7 @@ namespace Billing.API.Configurations
             builder.Services.AddScoped<IUserBalanceRepository, UserBalanceRepository>();
             builder.Services.AddScoped<IUsageEventRepository, UsageEventRepository>();
             builder.Services.AddScoped<IBillingService, BillingService>();
-            builder.Services.AddHostedService<UsageEventConsumer>();
-            builder.Services.AddSingleton<InMemoryEventQueue>();
+            builder.Services.AddScoped<KafkaProducerService>();
             builder.Services.AddHostedService<UsageEventConsumer>();
         }
     }

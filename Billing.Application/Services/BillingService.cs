@@ -30,11 +30,14 @@ namespace Billing.Application.Services
 
         public async Task ProcessUsageAsync(UsageEventDto dto)
         {
-            // Duplicate eventni qayta ishlamaslik
+            // 1. Idempotency check - duplicate eventlarni qayta ishlamaslik
             if (await _billingRepo.ExistsByEventIdAsync(dto.EventId))
-                return;
+            {
+                Console.WriteLine($"Duplicate event ignored: {dto.EventId}");
+                return; // Duplicate event - skip
+            }
 
-            // Eventni saqlaymiz (audit uchun)
+            // 2. UsageEvent saqlash (audit trail)
             var usageEvent = new UsageEvent
             {
                 EventId = dto.EventId,
@@ -43,10 +46,9 @@ namespace Billing.Application.Services
                 Currency = dto.Currency,
                 Timestamp = dto.Timestamp
             };
-
             await _usageRepo.AddAsync(usageEvent);
 
-            // Billing yozuvi yaratamiz
+            // 3. BillingRecord yaratish
             var billingRecord = new BillingRecord
             {
                 BillingId = Guid.NewGuid(),
@@ -56,26 +58,30 @@ namespace Billing.Application.Services
                 Currency = dto.Currency,
                 ProcessedAt = DateTime.UtcNow
             };
-
             await _billingRepo.AddAsync(billingRecord);
 
-            // Balance update
+            // 4. User balance yangilash
             var balance = await _balanceRepo.GetAsync(dto.UserId);
 
-            if (balance is null)
+            if (balance == null)
             {
+                // Yangi user - balance yaratish
                 balance = new UserBalance
                 {
                     UserId = dto.UserId,
                     Balance = 0
                 };
-
                 await _balanceRepo.AddAsync(balance);
             }
 
+            // Balance'ni yangilash
             balance.Balance += dto.Amount;
 
+            // 5. Barcha o'zgarishlarni saqlash
+            // Repository SaveChangesAsync() chaqiradi - bu ichida transaction bor
             await _balanceRepo.SaveChangesAsync();
+
+            Console.WriteLine($"Successfully processed event {dto.EventId} for user {dto.UserId}. New balance: {balance.Balance}");
         }
     }
 }
